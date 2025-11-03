@@ -1,12 +1,20 @@
+from datetime import date
 from django.db.models import F, Q, Count, Sum
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render, redirect
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import ensure_csrf_cookie
 
 from .form_dates import Ymd
-from .forms import *
-from .models import Room
+from .forms import (
+    BookingForm,
+    BookingFormExcluded,
+    CustomerForm,
+    EditBookingDatesForm,
+    RoomSearchForm,
+)
+from .models import Booking, Room
 from .reservation_code import generate
 
 
@@ -172,6 +180,54 @@ class EditBookingView(View):
         if customer_form.is_valid():
             customer_form.save()
             return redirect("/")
+
+
+class EditBookingDatesView(View):
+    """View for editing booking dates."""
+
+    def get(self, request: HttpRequest, pk: int) -> HttpResponse:
+        booking = Booking.objects.get(id=pk)
+        form = EditBookingDatesForm(instance=booking)
+        context = {
+            'booking': booking,
+            'form': form,
+            'error': None
+        }
+        return render(request, 'edit_booking_dates.html', context)
+
+    @method_decorator(ensure_csrf_cookie)
+    def post(self, request: HttpRequest, pk: int) -> HttpResponse:
+        booking = Booking.objects.get(id=pk)
+        form = EditBookingDatesForm(request.POST, instance=booking)
+        if form.is_valid():
+            new_checkin = form.cleaned_data['checkin']
+            new_checkout = form.cleaned_data['checkout']
+            if self.__has_conflicting_bookings(booking, new_checkin, new_checkout):
+                context = {
+                    'booking': booking,
+                    'form': form,
+                    'error': 'No hay disponibilidad para las fechas seleccionadas'
+                }
+                return render(request, 'edit_booking_dates.html', context)
+
+            form.save()
+            return redirect('/')
+
+        context = {
+            'booking': booking,
+            'form': form,
+            'error': None
+        }
+        return render(request, 'edit_booking_dates.html', context)
+
+    def __has_conflicting_bookings(self, booking: Booking, new_checkin: date, new_checkout: date) -> bool:
+        conflicting_bookings = (
+            Booking.objects
+            .filter(room=booking.room, state='NEW')
+            .exclude(id=booking.id)
+            .filter(checkin__lte=new_checkout, checkout__gte=new_checkin)
+        )
+        return conflicting_bookings.exists()
 
 
 class DashboardView(View):
