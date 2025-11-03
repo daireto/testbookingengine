@@ -1,5 +1,7 @@
 {
     "[jinja-html]": {
-        "editor.tabSize": 4
+        "editor.tabSize": 4,
+        "djlint.enableLinting": false,
+        "editor.defaultFormatter": "monosans.djlint",
     }
 }
