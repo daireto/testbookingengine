@@ -1,3 +1,6 @@
+from datetime import date, time, datetime
+from typing import Any
+
 from django.db.models import F, Q, Count, Sum
 from django.shortcuts import render, redirect
 from django.utils.decorators import method_decorator
@@ -176,52 +179,73 @@ class EditBookingView(View):
 
 class DashboardView(View):
     def get(self, request):
-        from datetime import date, time, datetime
         today = date.today()
+        today_range = self.__get_today_range(today)
 
-        # get bookings created today
-        today_min = datetime.combine(today, time.min)
-        today_max = datetime.combine(today, time.max)
-        today_range = (today_min, today_max)
-        new_bookings = (Booking.objects
-                        .filter(created__range=today_range)
-                        .values("id")
-                        ).count()
+        new_bookings = self.__get_new_bookings(today_range)
+        incoming = self.__get_incoming_guests(today)
+        outcoming = self.__get_outcoming_guests(today)
+        invoiced = self.__get_invoiced_guests(today_range)
+        occupancy_percentage = self.__get_occupancy_percentage()
 
-        # get incoming guests
-        incoming = (Booking.objects
-                    .filter(checkin=today)
-                    .exclude(state="DEL")
-                    .values("id")
-                    ).count()
-
-        # get outcoming guests
-        outcoming = (Booking.objects
-                     .filter(checkout=today)
-                     .exclude(state="DEL")
-                     .values("id")
-                     ).count()
-
-        # get outcoming guests
-        invoiced = (Booking.objects
-                    .filter(created__range=today_range)
-                    .exclude(state="DEL")
-                    .aggregate(Sum('total'))
-                    )
-
-        # preparing context data
         dashboard = {
             'new_bookings': new_bookings,
             'incoming_guests': incoming,
             'outcoming_guests': outcoming,
-            'invoiced': invoiced
-
+            'invoiced': invoiced,
+            'occupancy_percentage': occupancy_percentage,
         }
 
         context = {
             'dashboard': dashboard
         }
-        return render(request, "dashboard.html", context)
+        return render(request, 'dashboard.html', context)
+
+    def __get_today_range(self, today: date) -> tuple[datetime, datetime]:
+        today_min = datetime.combine(today, time.min)
+        today_max = datetime.combine(today, time.max)
+        return (today_min, today_max)
+
+    def __get_new_bookings(self, today_range: tuple[datetime, datetime]) -> int:
+        return (
+            Booking.objects
+            .filter(created__range=today_range)
+            .values('id')
+            .count()
+        )
+
+    def __get_incoming_guests(self, today: date) -> int:
+        return (
+            Booking.objects
+            .filter(checkin=today)
+            .exclude(state='DEL')
+            .values('id')
+            .count()
+        )
+
+    def __get_outcoming_guests(self, today: date) -> int:
+        return (
+            Booking.objects
+            .filter(checkout=today)
+            .exclude(state='DEL')
+            .values('id')
+            .count()
+        )
+
+    def __get_invoiced_guests(self, today_range: tuple[datetime, datetime]) -> dict[str, Any]:
+        return (
+            Booking.objects
+            .filter(created__range=today_range)
+            .exclude(state="DEL")
+            .aggregate(Sum('total'))
+        )
+
+    def __get_occupancy_percentage(self) -> float:
+        confirmed_bookings = Booking.objects.filter(state='NEW').count()
+        total_rooms = Room.objects.count()
+        if total_rooms > 0:
+            return (confirmed_bookings / total_rooms) * 100
+        return 0
 
 
 class RoomDetailsView(View):
