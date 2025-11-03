@@ -1,19 +1,56 @@
-{% extends "main.html"%}
+{% extends "main.html" %}
 
 {% block content %}
-<h1>Habitaciones del hotel</h1>
-{% for room in rooms%}
-<div class="row card mt-3 mb-3 hover-card bg-tr-250">
-    <div class="col p-3">
-        <div class="">
-            {{room.name}} ({{room.room_type__name}})
-        </div>
-        <div>
-            <a href="{% url 'room_details' pk=room.id%}">Ver detalles</a>
-        </div>
-        
+    <h1>Habitaciones del hotel</h1>
+
+    {# Search form #}
+    <div class="card card-body mb-4">
+        <form action="{% url 'rooms' %}" method="GET" class="row g-3 align-items-center">
+            <div class="col-auto">
+                <label for="filter" class="col-form-label">Buscar por nombre:</label>
+            </div>
+            <div class="col-md-6">
+                <input
+                    type="text"
+                    class="form-control"
+                    id="filter"
+                    name="filter"
+                    placeholder="Ej: Room 1"
+                    value="{{ filter }}">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Buscar</button>
+            </div>
+            {% if filter %}
+                <div class="col-auto">
+                    <a href="{% url 'rooms' %}" class="btn btn-outline-secondary">Limpiar filtro</a>
+                </div>
+            {% endif %}
+        </form>
+        {% if filter %}
+            <div class="mt-2">
+                <small class="text-muted">Filtrando por: <strong>{{ filter }}</strong></small>
+            </div>
+        {% endif %}
     </div>
-    
-</div>
-{% endfor %}
+
+    {# Rooms #}
+    {% if rooms|length == 0 %}
+        <div class="alert alert-warning">
+            No se encontraron habitaciones{% if filter %} que contengan "{{ filter }}"{% endif %}.
+        </div>
+    {% else %}
+        {% for room in rooms%}
+        <div class="row card mt-3 mb-3 hover-card bg-tr-250">
+            <div class="col p-3">
+                <div class="">
+                    {{room.name}} ({{room.room_type__name}})
+                </div>
+                <div>
+                    <a href="{% url 'room_details' pk=room.id%}">Ver detalles</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
 {% endblock content%}
